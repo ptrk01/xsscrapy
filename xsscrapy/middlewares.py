@@ -57,7 +57,7 @@ class InjectedDupeFilter(object):
             
             # MY METHOD CALLS
             self.writeToFile(orig_url)
-            self.checkForCodeInjection(url, payload)
+            self.checkForCodeInjection(url, payload, spider)
             
             return
 
@@ -86,7 +86,7 @@ class InjectedDupeFilter(object):
         
     ################## MY CODE STARTS HERE ####################
     
-    def checkForCodeInjection(self, url, xssPayload):
+    def checkForCodeInjection(self, url, xssPayload, spider):
         ciPayload="bountyKing{{9*9}}"
         payloadExecuted="bountyKing81"
 
