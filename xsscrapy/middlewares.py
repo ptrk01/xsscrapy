@@ -1,9 +1,11 @@
 from scrapy.exceptions import IgnoreRequest
-from urlparse import unquote
+from urlparse import unquote, urlparse
 from pybloom import BloomFilter
 import random
 import re
 from settings import bloomfilterSize
+import requests
+import urllib
 
 # Filter out duplicate requests with Bloom filters since they're much easier on memory
 #URLS_FORMS_HEADERS = BloomFilter(3000000, 0.00001)
@@ -39,6 +41,8 @@ class InjectedDupeFilter(object):
         if 'xss_place' not in meta:
             return
         delim = meta['delim']
+        payload = meta['payload']
+        orig_url= meta['orig_url']
 
         # Injected URL dupe handling
         if meta['xss_place'] == 'url':
@@ -50,6 +54,11 @@ class InjectedDupeFilter(object):
                 raise IgnoreRequest
             spider.log('Sending payloaded URL: %s' % url)
             URLS_SEEN.add(url)
+            
+            # MY METHOD CALLS
+            self.writeToFile(orig_url)
+            self.checkForCodeInjection(url, payload)
+            
             return
 
         # Injected form dupe handling
@@ -74,3 +83,44 @@ class InjectedDupeFilter(object):
             spider.log('Sending payloaded %s header' % h)
             HEADERS_SEEN.add(u_h)
             return
+        
+    ################## MY CODE STARTS HERE ####################
+    
+    def checkForCodeInjection(self, url, xssPayload):
+        ciPayload="bountyKing{{9*9}}"
+        payloadExecuted="bountyKing81"
+
+        url = self.prepareUrl(url, xssPayload, ciPayload)
+        
+        spider.log('Sending Code Injection URL: %s' % url)
+        
+        response = requests.get(url)
+        
+        if payloadExecuted in str(response.content):
+           spider.log('BOOOOOOOOOOOOOM! Code Injection Found! URL: %s' % url)
+           
+           with open("codeInjection-"+self.getHost(url)+".txt", "a") as output:
+            output.write("URL: " + url +"\n")
+            output.write("Payload: " + ciPayload +"\n")
+            output.write(str(response.content)+"\n")
+            output.write(url+"\n\n\n")
+    
+    # Ersetze in einer Url den Payload von XSScrapy (oldPayload) mit einen eigenen (newPayload)
+    def prepareUrl(self, url, oldPayload, newPayload):
+        oldPayload = oldPayload.replace("'\"(){}<x>", "'%22()%7B%7D%3Cx%3E")
+        #print oldPayload
+        #print newPayload
+        #print url
+        url = url.replace(oldPayload, newPayload)
+        return url
+    
+    # Gebe den Urls von einer Url zurueck, z.B. aus https://example.com/1/2/i.html wird example.com
+    def getHost(self, url):
+        host = url.replace("https://", "")
+        host = host.replace("http://", "")
+        host = host.split("/")[0]
+        return host
+    
+    def writeToFile(self, url):
+        with open("urls/urls-"+self.getHost(url)+".txt", "a") as output:
+            output.write(url+"\n")
